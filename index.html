@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TeraPlay — Terabox Video Player</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Noto+Sans+Bengali:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c10;
+      --surface: #0d1117;
+      --surface2: #161b22;
+      --border: #21262d;
+      --accent: #58a6ff;
+      --accent2: #f78166;
+      --text: #e6edf3;
+      --muted: #7d8590;
+      --glow: 0 0 40px rgba(88,166,255,0.12);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88,166,255,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(247,129,102,0.05) 0%, transparent 50%);
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .logo {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo span { font-weight: 400; opacity: 0.7; }
+
+    .tagline {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 0.3rem;
+      font-weight: 300;
+    }
+
+    /* Input Card */
+    .input-card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: var(--glow);
+      animation: fadeDown 0.7s ease both;
+    }
+
+    .input-label {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+      letter-spacing: 0.05em;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-family: 'Syne', monospace;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .url-input::placeholder { color: var(--muted); }
+
+    .url-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+    }
+
+    .play-btn {
+      background: linear-gradient(135deg, var(--accent), #1f6feb);
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1.4rem;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .play-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .play-btn:active { transform: translateY(0); }
+    .play-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Status */
+    .status-bar {
+      margin-top: 1rem;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 0.82rem;
+      min-height: 1.2em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      transition: color 0.3s;
+    }
+
+    .status-bar.loading { color: var(--accent); }
+    .status-bar.error { color: var(--accent2); }
+    .status-bar.success { color: #3fb950; }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(88,166,255,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* Player Wrapper */
+    .player-wrapper {
+      width: 100%;
+      max-width: 680px;
+      margin-top: 1.5rem;
+      display: none;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .player-wrapper.visible { display: block; }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Video Info */
+    .video-info {
+      margin-top: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .thumb {
+      width: 80px;
+      height: 52px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--surface2);
+      display: none;
+    }
+
+    .thumb.loaded { display: block; }
+
+    .info-text { flex: 1; overflow: hidden; }
+
+    .video-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 0.3rem;
+    }
+
+    .quality-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'Syne', sans-serif;
+      text-decoration: none;
+    }
+
+    .badge:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .badge.active {
+      background: rgba(88,166,255,0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .badge.download {
+      border-color: rgba(247,129,102,0.4);
+      color: var(--accent2);
+    }
+
+    .badge.download:hover {
+      background: rgba(247,129,102,0.1);
+      border-color: var(--accent2);
+    }
+
+    /* API Notice */
+    .notice {
+      width: 100%;
+      max-width: 680px;
+      margin-top: 1rem;
+      padding: 0.8rem 1rem;
+      background: rgba(247,129,102,0.07);
+      border: 1px solid rgba(247,129,102,0.2);
+      border-radius: 10px;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.6;
+      display: none;
+    }
+
+    .notice.visible { display: block; animation: fadeUp 0.4s ease both; }
+
+    /* Animations */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .input-row { flex-direction: column; }
+      .play-btn { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Tera<span>Play</span></div>
+  <p class="tagline">Terabox লিংক দাও, সাথে সাথে ভিডিও চলবে</p>
+</header>
+
+<div class="input-card">
+  <div class="input-label">Terabox ভিডিও লিংক পেস্ট করো</div>
+  <div class="input-row">
+    <input
+      type="text"
+      class="url-input"
+      id="teraUrl"
+      placeholder="https://terabox.com/s/1xxxx..."
+      autocomplete="off"
+    />
+    <button class="play-btn" id="playBtn" onclick="loadVideo()">
+      ▶ Play
+    </button>
+  </div>
+  <div class="status-bar" id="statusBar"></div>
+</div>
+
+<div class="player-wrapper" id="playerWrapper">
+  <div class="video-container">
+    <video id="videoPlayer" controls playsinline></video>
+  </div>
+  <div class="video-info" id="videoInfo">
+    <img class="thumb" id="thumbImg" alt="thumbnail"/>
+    <div class="info-text">
+      <div class="video-title" id="videoTitle">ভিডিও লোড হচ্ছে...</div>
+      <div class="quality-badges" id="qualityBadges"></div>
+    </div>
+  </div>
+</div>
+
+<div class="notice" id="apiNotice">
+  ⚠️ CORS সমস্যার কারণে browser থেকে সরাসরি API call কাজ না করলে, এই HTML ফাইলটা একটা web server (যেমন Vercel, Netlify, বা localhost) এ রাখো।
+</div>
+
+<script>
+  // Vercel serverless function — proxies Terabox API
+  const API_BASE = "/api/terabox";
+  let hlsInstance = null;
+
+  // Enter key support
+  document.getElementById('teraUrl').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadVideo();
+  });
+
+  function setStatus(msg, type = '') {
+    const bar = document.getElementById('statusBar');
+    bar.className = 'status-bar ' + type;
+    if (type === 'loading') {
+      bar.innerHTML = `<div class="spinner"></div> ${msg}`;
+    } else if (type === 'error') {
+      bar.innerHTML = `<div class="dot"></div> ${msg}`;
+    } else if (type === 'success') {
+      bar.innerHTML = `<div class="dot"></div> ${msg}`;
+    } else {
+      bar.innerHTML = msg;
+    }
+  }
+
+  async function loadVideo() {
+    const url = document.getElementById('teraUrl').value.trim();
+    if (!url) { setStatus('একটা Terabox লিংক দাও!', 'error'); return; }
+
+    const btn = document.getElementById('playBtn');
+    btn.disabled = true;
+    setStatus('API থেকে ভিডিও লিংক নিচ্ছি...', 'loading');
+    document.getElementById('playerWrapper').classList.remove('visible');
+    document.getElementById('apiNotice').classList.remove('visible');
+
+    try {
+      const apiUrl = `${API_BASE}?url=${encodeURIComponent(url)}`;
+      const res = await fetch(apiUrl);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      console.log('API Response:', data);
+
+      // API returns: { success, files: [{ file_name, download_url, streaming_url, thumbnail, size }] }
+      if (!data.success || !data.files || data.files.length === 0) {
+        throw new Error(data.error || 'ভিডিও পাওয়া যায়নি');
+      }
+
+      const file = data.files[0];
+      const title       = file.file_name || 'Terabox Video';
+      const thumb       = file.thumbnail || '';
+
+      // Worker proxies through /download?dlink=REAL_URL — extract the real CDN URL directly
+      function extractDirectUrl(url) {
+        if (!url) return '';
+        try {
+          const u = new URL(url);
+          const dlink = u.searchParams.get('dlink');
+          return dlink ? dlink : url;
+        } catch { return url; }
+      }
+
+      const streamUrl   = extractDirectUrl(file.streaming_url || '');
+      const downloadUrl = extractDirectUrl(file.download_url || '');
+
+      // Set title
+      document.getElementById('videoTitle').textContent = title;
+
+      // Set thumbnail
+      if (thumb) {
+        const img = document.getElementById('thumbImg');
+        img.src = thumb;
+        img.onload = () => img.classList.add('loaded');
+      }
+
+      // Build badges
+      const badgesEl = document.getElementById('qualityBadges');
+      badgesEl.innerHTML = '';
+
+      if (downloadUrl) {
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.target = '_blank';
+        a.className = 'badge download';
+        a.textContent = '⬇ Download';
+        badgesEl.appendChild(a);
+      }
+
+      // If multiple files, add badges for each
+      data.files.forEach((f, i) => {
+        if (!f.streaming_url && !f.download_url) return;
+        if (data.files.length > 1) {
+          const b = document.createElement('button');
+          b.className = 'badge' + (i === 0 ? ' active' : '');
+          b.textContent = f.file_name ? f.file_name.substring(0, 20) : `File ${i+1}`;
+          const playLink = extractDirectUrl(f.streaming_url || f.download_url || '');
+          b.onclick = () => {
+            document.querySelectorAll('.badge:not(.download)').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            playStream(playLink);
+          };
+          badgesEl.appendChild(b);
+        }
+      });
+
+      // Show player
+      document.getElementById('playerWrapper').classList.add('visible');
+
+      const finalStream = streamUrl || downloadUrl;
+      if (!finalStream) throw new Error('কোনো playable লিংক পাওয়া যায়নি');
+
+      playStream(finalStream);
+      setStatus('ভিডিও লোড হয়েছে ✓', 'success');
+
+    } catch (err) {
+      console.error(err);
+      if (err.message.includes('Failed to fetch') || err.name === 'TypeError') {
+        setStatus('CORS ব্লক হয়েছে — নিচের নোট দেখো', 'error');
+        document.getElementById('apiNotice').classList.add('visible');
+      } else {
+        setStatus('সমস্যা হয়েছে: ' + err.message, 'error');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function playStream(url) {
+    const video = document.getElementById('videoPlayer');
+
+    // Destroy previous HLS instance
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+    const isM3U8 = url.includes('.m3u8') || url.includes('m3u8') || url.includes('get_m3u8');
+
+    if (isM3U8 && Hls.isSupported()) {
+      hlsInstance = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = false;
+        }
+      });
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(video);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+      hlsInstance.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          setStatus('HLS error: ' + data.type, 'error');
+        }
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS
+      video.src = url;
+      video.play().catch(() => {});
+    } else {
+      // Direct mp4 or fallback
+      video.src = url;
+      video.play().catch(() => {});
+    }
+  }
+</script>
+
+</body>
+</html>
